@@ -156,6 +156,61 @@ export class BinanceService {
         })
     }
 
+    protected async signAndSendRequest<TResponse>(
+        method: Method,
+        path: string,
+        params = {},
+        apiKey?: string,
+        secretKey?: string,
+        isDifferentArrayFormat = false,
+    ): Promise<TResponse> {
+        const clearParams = utils.removeEmptyValue(params)
+        clearParams.recvWindow = this._recvWindow
+        const timestamp = Date.now()
+        const queryString = utils.buildQueryString(
+            {
+                ...clearParams,
+                timestamp,
+            },
+            isDifferentArrayFormat,
+        )
+        const signature = crypto
+            .createHmac('sha256', secretKey || this._binanceApiSecret)
+            .update(queryString)
+            .digest('hex')
+
+        const httpsAgent =
+            secretKey && this._proxyEnable === 'true'
+                ? new HttpsProxyAgent({
+                      host: this._proxyHost,
+                      port: this._proxyPort,
+                      auth: this._proxyAuth,
+                  })
+                : undefined
+        return await this.request<TResponse>({
+            method,
+            url: `${path}?${queryString}&signature=${signature}`,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-MBX-APIKEY': apiKey || this._binanceApiKey,
+                // eslint-disable-next-line @typescript-eslint/naming-convention
+                Accept: 'application/json',
+            },
+            httpsAgent,
+        })
+    }
+
+    async getCoinsInfo(): Promise<unknown[]> {
+        this._logger.debug(`Get coins info`)
+        const coins = await this.signAndSendRequest<unknown[]>(
+            'GET',
+            '/sapi/v1/capital/config/getall',
+            {},
+        )
+
+        return coins
+    }
+
     async applyDeposit(payload: ApplyDepositDto): Promise<AppliedDeposit> {
         const logContext = `${this._baseLogContext}:${this.applyDeposit.name}`
         this._logger.debug(
