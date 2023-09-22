@@ -22,7 +22,7 @@ const CONFIGS = (): Record<string, unknown> => ({
 })
 ```
 
-#### Execute test commands
+#### Execute test command
 ```shell
 npm run test
 ```
